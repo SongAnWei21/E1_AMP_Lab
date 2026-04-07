@@ -17,3 +17,5 @@
 # and is distributed under the BSD-3-Clause license.
 
 from legged_lab.assets.tienkung2_lite.tienkung import *
+from legged_lab.assets.tienkung2_lite.tienkung_12dof import *
+

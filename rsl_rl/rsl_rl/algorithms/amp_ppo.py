@@ -109,7 +109,7 @@ class AMPPPO:
             self.symmetry = None
 
         # Discriminator components
-        self.amploss_coef = 1.0
+        self.amploss_coef = 1.0  # amploss系数
         self.min_std = min_std
         self.discriminator = discriminator
         self.discriminator.to(self.device)
@@ -316,7 +316,7 @@ class AMPPPO:
             sigma_batch = self.policy.action_std[:original_batch_size]
             entropy_batch = self.policy.entropy[:original_batch_size]
 
-            # KL
+            # KL  这里的kl是动态调整学习率
             if self.desired_kl is not None and self.schedule == "adaptive":
                 with torch.inference_mode():
                     kl = torch.sum(
@@ -355,11 +355,11 @@ class AMPPPO:
 
             # Surrogate loss
             ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
-            surrogate = -torch.squeeze(advantages_batch) * ratio
-            surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(
+            surrogate = -torch.squeeze(advantages_batch) * ratio  # At * ratio
+            surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp( 
                 ratio, 1.0 - self.clip_param, 1.0 + self.clip_param
             )
-            surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
+            surrogate_loss = torch.max(surrogate, surrogate_clipped).mean() # 前面加了-号，变成了最大化问题
 
             # Value function loss
             if self.use_clipped_value_loss:
@@ -374,7 +374,7 @@ class AMPPPO:
 
             loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
-            # Symmetry loss
+            # Symmetry loss  对称性loss
             if self.symmetry:
                 # obtain the symmetric actions
                 # if we did augmentation before then we don't need to augment again
@@ -409,7 +409,7 @@ class AMPPPO:
                 else:
                     symmetry_loss = symmetry_loss.detach()
 
-            # Random Network Distillation loss
+            # Random Network Distillation loss  随机网络蒸馏
             if self.rnd:
                 # predict the embedding and the target
                 predicted_embedding = self.rnd.predictor(rnd_state_batch)
@@ -418,7 +418,7 @@ class AMPPPO:
                 mseloss = torch.nn.MSELoss()
                 rnd_loss = mseloss(predicted_embedding, target_embedding)
 
-            # Discriminator loss.
+            # Discriminator loss.  判别器loss
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
             if self.amp_normalizer is not None:
@@ -429,10 +429,11 @@ class AMPPPO:
                     expert_next_state = self.amp_normalizer.normalize_torch(expert_next_state, self.device)
             policy_d = self.discriminator(torch.cat([policy_state, policy_next_state], dim=-1))
             expert_d = self.discriminator(torch.cat([expert_state, expert_next_state], dim=-1))
-            expert_loss = torch.nn.MSELoss()(expert_d, torch.ones(expert_d.size(), device=self.device))
-            policy_loss = torch.nn.MSELoss()(policy_d, -1 * torch.ones(policy_d.size(), device=self.device))
+
+            expert_loss = torch.nn.MSELoss()(expert_d, torch.ones(expert_d.size(), device=self.device)) # 1(越像expert)
+            policy_loss = torch.nn.MSELoss()(policy_d, -1 * torch.ones(policy_d.size(), device=self.device))# -1(越像policy)
             amp_loss = 0.5 * (expert_loss + policy_loss)
-            grad_pen_loss = self.discriminator.compute_grad_pen(*sample_amp_expert, lambda_=10)
+            grad_pen_loss = self.discriminator.compute_grad_pen(*sample_amp_expert, lambda_=10) # 梯度惩罚损失
             loss += self.amploss_coef * amp_loss + self.amploss_coef * grad_pen_loss
 
             # Compute the gradients

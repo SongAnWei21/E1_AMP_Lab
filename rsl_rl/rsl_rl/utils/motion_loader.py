@@ -18,17 +18,33 @@
 
 import glob
 import json
-
 import numpy as np
 import torch
 
+# ==============================================================================
+# 宏定义 / 机器人配置开关
+# 在这里修改 ACTIVE_ROBOT 的值即可一键切换底层维度配置
+# 可选值: "e1_12dof", "tienkung", "e1_21dof"
+# ==============================================================================
+ACTIVE_ROBOT = "e1_12dof"
+# ACTIVE_ROBOT = "e1_21dof"
+#ACTIVE_ROBOT = "tienkung_12dof"
+# ACTIVE_ROBOT = "tienkung"
+
+
+ROBOT_CONFIGS = {
+    "e1_12dof": {"pos_size": 12, "vel_size": 12, "end_pos_size": 6},
+    "tienkung_12dof": {"pos_size": 12, "vel_size": 12, "end_pos_size": 6},
+    "tienkung": {"pos_size": 20, "vel_size": 20, "end_pos_size": 12},
+    "e1_21dof": {"pos_size": 21, "vel_size": 21, "end_pos_size": 12},
+}
 
 class AMPLoader:
-    JOINT_POS_SIZE = 20
 
-    JOINT_VEL_SIZE = 20
-
-    END_EFFECTOR_POS_SIZE = 12
+    # 动态读取当前激活的机器人维度配置
+    JOINT_POS_SIZE = ROBOT_CONFIGS[ACTIVE_ROBOT]["pos_size"]
+    JOINT_VEL_SIZE = ROBOT_CONFIGS[ACTIVE_ROBOT]["vel_size"]
+    END_EFFECTOR_POS_SIZE = ROBOT_CONFIGS[ACTIVE_ROBOT]["end_pos_size"]
 
     JOINT_POSE_START_IDX = 0
     JOINT_POSE_END_IDX = JOINT_POSE_START_IDX + JOINT_POS_SIZE
@@ -150,7 +166,7 @@ class AMPLoader:
         """Returns frame for the given trajectory at the specified time."""
         p = times / self.trajectory_lens[traj_idxs]
         n = self.trajectory_num_frames[traj_idxs]
-        idx_low, idx_high = np.floor(p * n).astype(np.int), np.ceil(p * n).astype(np.int)
+        idx_low, idx_high = np.floor(p * n).astype(np.int64), np.ceil(p * n).astype(np.int64)
         all_frame_starts = torch.zeros(len(traj_idxs), self.observation_dim, device=self.device)
         all_frame_ends = torch.zeros(len(traj_idxs), self.observation_dim, device=self.device)
         for traj_idx in set(traj_idxs):
@@ -166,6 +182,8 @@ class AMPLoader:
         p = float(time) / self.trajectory_lens[traj_idx]
         n = self.trajectories_full[traj_idx].shape[0]
         idx_low, idx_high = int(np.floor(p * n)), int(np.ceil(p * n))
+        idx_low = min(idx_low, n - 1)
+        idx_high = min(idx_high, n - 1)
         frame_start = self.trajectories_full[traj_idx][idx_low]
         frame_end = self.trajectories_full[traj_idx][idx_high]
         blend = p * n - idx_low
@@ -217,24 +235,18 @@ class AMPLoader:
             return self.get_full_frame_at_time_batch(traj_idxs, times)
 
     def blend_frame_pose(self, frame0, frame1, blend):
-        """Linearly interpolate between two frames, including orientation.
-
-        Args:
-            frame0: First frame to be blended corresponds to (blend = 0).
-            frame1: Second frame to be blended corresponds to (blend = 1).
-            blend: Float between [0, 1], specifying the interpolation between
-            the two frames.
-        Returns:
-            An interpolation of the two frames.
-        """
-
+        """Linearly interpolate between two frames, including orientation."""
+        
         joints0, joints1 = AMPLoader.get_joint_pose(frame0), AMPLoader.get_joint_pose(frame1)
         joint_vel_0, joint_vel_1 = AMPLoader.get_joint_vel(frame0), AMPLoader.get_joint_vel(frame1)
+        end_pos_0, end_pos_1 = AMPLoader.get_end_pos(frame0), AMPLoader.get_end_pos(frame1)
 
         blend_joint_q = self.slerp(joints0, joints1, blend)
         blend_joints_vel = self.slerp(joint_vel_0, joint_vel_1, blend)
+        blend_end_pos = self.slerp(end_pos_0, end_pos_1, blend)
 
-        return torch.cat([blend_joint_q, blend_joints_vel])
+        # 修复：必须把末端执行器的数据也拼回去！
+        return torch.cat([blend_joint_q, blend_joints_vel, blend_end_pos])
 
     def feed_forward_generator(self, num_mini_batch, mini_batch_size):
         """Generates a batch of AMP transitions."""
@@ -264,20 +276,26 @@ class AMPLoader:
     def num_motions(self):
         return len(self.trajectory_names)
 
+    @staticmethod
     def get_joint_pose(pose):
         return pose[AMPLoader.JOINT_POSE_START_IDX : AMPLoader.JOINT_POSE_END_IDX]
 
+    @staticmethod
     def get_joint_pose_batch(poses):
         return poses[:, AMPLoader.JOINT_POSE_START_IDX : AMPLoader.JOINT_POSE_END_IDX]
 
+    @staticmethod
     def get_joint_vel(pose):
         return pose[AMPLoader.JOINT_VEL_START_IDX : AMPLoader.JOINT_VEL_END_IDX]
 
+    @staticmethod
     def get_joint_vel_batch(poses):
         return poses[:, AMPLoader.JOINT_VEL_START_IDX : AMPLoader.JOINT_VEL_END_IDX]
 
+    @staticmethod
     def get_end_pos(pose):
         return pose[AMPLoader.END_POS_START_IDX : AMPLoader.END_POS_END_IDX]
 
+    @staticmethod
     def get_end_pos_batch(poses):
         return poses[:, AMPLoader.END_POS_START_IDX : AMPLoader.END_POS_END_IDX]

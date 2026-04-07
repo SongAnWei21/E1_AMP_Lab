@@ -18,15 +18,32 @@
 
 import glob
 import json
-
 import numpy as np
 import torch
 
+# ==============================================================================
+# 宏定义 / 机器人配置开关
+# 在这里修改 ACTIVE_ROBOT 的值即可一键切换底层维度配置
+# 可选值: "e1_12dof", "tienkung", "e1_21dof"
+# ==============================================================================
+# ACTIVE_ROBOT = "e1_12dof"
+ACTIVE_ROBOT = "e1_21dof"
+#ACTIVE_ROBOT = "tienkung_12dof"
+#ACTIVE_ROBOT = "tienkung"
+
+
+ROBOT_CONFIGS = {
+    "tienkung": {"pos_size": 26, "vel_size": 26},  # 注意：如果你确定天工是20dof，请把这里的26改成20
+    "tienkung_12dof": {"pos_size": 18, "vel_size": 18},
+    "e1_12dof": {"pos_size": 18, "vel_size": 18},
+    "e1_21dof": {"pos_size": 27, "vel_size": 27},
+}
 
 class AMPLoaderDisplay:
-    JOINT_POS_SIZE = 26
-
-    JOINT_VEL_SIZE = 26
+    
+    # 动态读取当前激活的机器人维度配置
+    JOINT_POS_SIZE = ROBOT_CONFIGS[ACTIVE_ROBOT]["pos_size"]
+    JOINT_VEL_SIZE = ROBOT_CONFIGS[ACTIVE_ROBOT]["vel_size"]
 
     JOINT_POSE_START_IDX = 0
     JOINT_POSE_END_IDX = JOINT_POSE_START_IDX + JOINT_POS_SIZE
@@ -148,7 +165,7 @@ class AMPLoaderDisplay:
         """Returns frame for the given trajectory at the specified time."""
         p = times / self.trajectory_lens[traj_idxs]
         n = self.trajectory_num_frames[traj_idxs]
-        idx_low, idx_high = np.floor(p * n).astype(np.int), np.ceil(p * n).astype(np.int)
+        idx_low, idx_high = np.floor(p * n).astype(int), np.ceil(p * n).astype(int)
         all_frame_starts = torch.zeros(len(traj_idxs), self.observation_dim, device=self.device)
         all_frame_ends = torch.zeros(len(traj_idxs), self.observation_dim, device=self.device)
         for traj_idx in set(traj_idxs):
@@ -174,7 +191,7 @@ class AMPLoaderDisplay:
     def get_full_frame_at_time_batch(self, traj_idxs, times):
         p = times / self.trajectory_lens[traj_idxs]
         n = self.trajectory_num_frames[traj_idxs]
-        idx_low, idx_high = np.floor(p * n).astype(np.int), np.ceil(p * n).astype(np.int)
+        idx_low, idx_high = np.floor(p * n).astype(int), np.ceil(p * n).astype(int)
         all_frame_amp_starts = torch.zeros(
             len(traj_idxs),
             AMPLoaderDisplay.JOINT_VEL_END_IDX - AMPLoaderDisplay.JOINT_POSE_START_IDX,
@@ -269,14 +286,18 @@ class AMPLoaderDisplay:
     def num_motions(self):
         return len(self.trajectory_names)
 
+    @staticmethod
     def get_joint_pose(pose):
         return pose[AMPLoaderDisplay.JOINT_POSE_START_IDX : AMPLoaderDisplay.JOINT_POSE_END_IDX]
 
+    @staticmethod
     def get_joint_pose_batch(poses):
         return poses[:, AMPLoaderDisplay.JOINT_POSE_START_IDX : AMPLoaderDisplay.JOINT_POSE_END_IDX]
 
+    @staticmethod
     def get_joint_vel(pose):
         return pose[AMPLoaderDisplay.JOINT_VEL_START_IDX : AMPLoaderDisplay.JOINT_VEL_END_IDX]
 
+    @staticmethod
     def get_joint_vel_batch(poses):
         return poses[:, AMPLoaderDisplay.JOINT_VEL_START_IDX : AMPLoaderDisplay.JOINT_VEL_END_IDX]
