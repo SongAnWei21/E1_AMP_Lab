@@ -41,11 +41,11 @@ from legged_lab.terrains import GRAVEL_TERRAINS_CFG, ROUGH_TERRAINS_CFG  # noqa:
 # =====================================================================
 @configclass
 class GaitCfg:
-    gait_air_ratio_l: float = 0.4    # 左腿腾空时间比例
-    gait_air_ratio_r: float = 0.4    # 右腿腾空时间比例
-    gait_phase_offset_l: float = 0.4 # 左腿相位偏移 (决定左腿何时开始动作)
-    gait_phase_offset_r: float = 0.9 # 右腿相位偏移 (通常与左腿错开半个周期, 0.38+0.5=0.88)
-    gait_cycle: float = 0.7          # 完整步态周期的持续时间 (秒)
+    gait_air_ratio_l: float = 0.38    # 左腿腾空时间比例
+    gait_air_ratio_r: float = 0.38    # 右腿腾空时间比例
+    gait_phase_offset_l: float = 0.38 # 左腿相位偏移 (决定左腿何时开始动作)
+    gait_phase_offset_r: float = 0.88 # 右腿相位偏移 (通常与左腿错开半个周期, 0.38+0.5=0.88)
+    gait_cycle: float = 0.7           # 完整步态周期的持续时间 (秒)
 
 
 # =====================================================================
@@ -56,7 +56,7 @@ class GaitCfg:
 class E1_21DOF_RewardCfg:
     # --- 任务目标 (鼓励) ---
     track_lin_vel_xy_exp = RewTerm(func=mdp.track_lin_vel_xy_yaw_frame_exp, weight=3.0, params={"std": 0.5}) # 跟踪 XY 轴平移速度指令
-    track_ang_vel_z_exp = RewTerm(func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"std": 0.5})       # 跟踪 Z 轴转向(偏航)指令
+    track_ang_vel_z_exp = RewTerm(func=mdp.track_ang_vel_z_world_exp, weight=1.0, params={"std": 0.5})       # 跟踪 Z 轴转向(偏航)指令
 
     # --- 姿态与稳定性惩罚 ---
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)          # 惩罚 Z 轴垂直速度 (防止机器人像兔子一样上下乱跳)
@@ -69,7 +69,7 @@ class E1_21DOF_RewardCfg:
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0) # 惩罚整体姿态偏离水平
 
     # --- 动作平滑与节能惩罚 ---
-    energy = RewTerm(func=mdp.energy, weight=-1e-5)                     # 惩罚总能量消耗
+    energy = RewTerm(func=mdp.energy, weight=-1e-3)                     # 惩罚总能量消耗
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)         # 惩罚关节加速度 (让动作更平滑)
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)     # 惩罚相邻帧动作指令的变化率 (防止高频震荡)
 
@@ -151,7 +151,7 @@ class E1_21DOF_RewardCfg:
 
     joint_deviation_pitch = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=0.5,
+        weight=0.05,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot", 
@@ -163,7 +163,7 @@ class E1_21DOF_RewardCfg:
     # 限制腰部关节的过度扭动，收紧核心，逼迫它用摆臂来抵消角动量
     joint_deviation_waist = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-100.0,  # 给一个中等强度的负惩罚
+        weight=-1.0,  # 给一个中等强度的负惩罚
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot", 
@@ -196,15 +196,27 @@ class E1_21DOF_RewardCfg:
     )
 
     # --- 周期性步态奖励 (强制形成周期性迈步) ---
-    gait_feet_frc_perio = RewTerm(func=mdp.gait_feet_frc_perio, weight=2.0, params={"delta_t": 0.02}) # 脚部接触力的周期性
-    gait_feet_spd_perio = RewTerm(func=mdp.gait_feet_spd_perio, weight=2.0, params={"delta_t": 0.02}) # 脚部速度的周期性
-    gait_feet_frc_support_perio = RewTerm(func=mdp.gait_feet_frc_support_perio, weight=1.5, params={"delta_t": 0.02})
+    gait_feet_frc_perio = RewTerm(func=mdp.gait_feet_frc_perio, weight=1.0, params={"delta_t": 0.02}) # 脚部接触力的周期性
+    gait_feet_spd_perio = RewTerm(func=mdp.gait_feet_spd_perio, weight=1.0, params={"delta_t": 0.02}) # 脚部速度的周期性
+    gait_feet_frc_support_perio = RewTerm(func=mdp.gait_feet_frc_support_perio, weight=0.5, params={"delta_t": 0.02})
 
     # --- 杂项惩罚 ---
     ankle_torque = RewTerm(func=mdp.ankle_torque, weight=-0.0005) # 惩罚踝关节输出大扭矩
     ankle_action = RewTerm(func=mdp.ankle_action, weight=-0.001)  # 惩罚频繁使用踝关节动作
     hip_roll_action = RewTerm(func=mdp.hip_roll_action, weight=-1.0) # 强烈惩罚髋关节横滚(劈叉动作)
     hip_yaw_action = RewTerm(func=mdp.hip_yaw_action, weight=-1.0)   # 强烈惩罚髋关节偏航(内八/外八)
+    # 🔴 新增的肘部惩罚
+    elbow_action = RewTerm(func=mdp.elbow_action, weight=-0.01)   # 惩罚网络乱指挥肘部
+    elbow_torque = RewTerm(func=mdp.elbow_torque, weight=-0.0005) # 惩罚底层力矩过载
+
+    # 强烈压制手臂向外侧平举和内外旋
+    shoulder_roll_action = RewTerm(func=mdp.shoulder_roll_action, weight=-0.01)
+    shoulder_yaw_action = RewTerm(func=mdp.shoulder_yaw_action, weight=-0.01)
+    
+    # 轻微惩罚力矩消耗
+    shoulder_roll_torque = RewTerm(func=mdp.shoulder_roll_torque, weight=-0.0005)
+    shoulder_yaw_torque = RewTerm(func=mdp.shoulder_yaw_torque, weight=-0.0005)
+
     feet_y_distance = RewTerm(func=mdp.feet_y_distance, weight=-2.0) # 惩罚两脚在 Y 轴(横向)上的距离偏差
 
 
@@ -215,7 +227,7 @@ class E1_21DOF_RewardCfg:
 @configclass
 class E1_21DOF_WalkFlatEnvCfg:
     # 纯显示用的 AMP 动作文件
-    amp_motion_files_display = ["legged_lab/envs/e1_21dof/datasets/motion_visualization/small_forward_boy.txt"]
+    amp_motion_files_display = ["legged_lab/envs/e1_21dof/datasets/motion_visualization/B23-side_step_right_poses.txt"]
     device: str = "cuda:0"
 
     # --- 场景配置 ---
@@ -397,7 +409,17 @@ class E1_21DOF_WalkAgentCfg(RslRlOnPolicyRunnerCfg):
 
     # --- AMP参数 ---
     amp_reward_coef = 0.3 # 动作模仿奖励的权重 (判别器认为动作越真，奖励越高)
-    amp_motion_files = ["legged_lab/envs/e1_21dof/datasets/motion_amp_expert/small_forward_boy.txt"] # 专家动作捕捉数据文件
+    amp_motion_files = ["legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B4-stand_to_walk_back_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B9-walk_turn_left90_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B10-walk_turn_left45_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B11-walk_turn_left135_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B12-walk_turn_right90_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B13-walk_turn_right45_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B14-walk_turn_right135_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B22-side_step_left_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/B23-side_step_right_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_amp_expert/Walk-B4-Stand_to_Walk_Back_poses.txt",
+                        "legged_lab/envs/e1_21dof/datasets/motion_visualization/small_forward_boy.txt"]
     amp_num_preload_transitions = 200000 # 预加载的动捕数据帧数
     amp_task_reward_lerp = 0.7           # 任务奖励(Task Reward)和模仿奖励(AMP Reward)的融合比例
     amp_discr_hidden_dims = [1024, 512, 256] # 判别器(Discriminator)的网络结构

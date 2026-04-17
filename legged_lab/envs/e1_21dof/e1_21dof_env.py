@@ -216,6 +216,12 @@ class E1_21DOF_Env(VecEnv):
             preserve_order=True,
         )
 
+        # 添加
+        self.elbow_joint_ids, _ = self.robot.find_joints(
+            name_keys=["left_elbow_joint", "right_elbow_joint"], 
+            preserve_order=True,
+        )
+
         self.obs_scales = self.cfg.normalization.obs_scales
         self.add_noise = self.cfg.noise.add_noise
 

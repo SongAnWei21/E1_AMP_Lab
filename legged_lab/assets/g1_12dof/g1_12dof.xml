@@ -3,7 +3,14 @@
 
   <default>
     <motor ctrlrange="-300 300" ctrllimited="true"/>
-    <joint actuatorfrclimited="true" type="hinge"/>
+    
+    <joint actuatorfrclimited="true" type="hinge" armature="0.02" frictionloss="0.1" damping="0.5"/>
+    
+    <geom contype="0" conaffinity="0"/>
+    
+    <default class="collision_geom">
+      <geom contype="1" conaffinity="1"/>
+    </default>
   </default>
 
   <asset>
@@ -85,6 +92,8 @@
                   <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="0.2 0.2 0.2 1"/>
                   <geom size="0.005" pos="0.12 0.03 -0.03" rgba="0.2 0.2 0.2 1"/>
                   <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="0.2 0.2 0.2 1"/>
+                  <geom class="collision_geom" type="capsule" size="0.01" fromto="0.1 -0.026 -0.025 0.05 -0.027 -0.025" rgba="1 0 0 1"/>
+                  <geom class="collision_geom" type="capsule" size="0.01" fromto="-0.044 -0.018 -0.025 0.123 -0.018 -0.025" rgba="1 0 0 1"/>
                   <body name="left_toe_link" pos="0.1 0 -0.02"/>
                 </body>
               </body>
@@ -126,6 +135,8 @@
                   <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="0.2 0.2 0.2 1"/>
                   <geom size="0.005" pos="0.12 0.03 -0.03" rgba="0.2 0.2 0.2 1"/>
                   <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="0.2 0.2 0.2 1"/>
+                  <geom class="collision_geom" type="capsule" size="0.01" fromto="0.1 -0.026 -0.025 0.05 -0.027 -0.025" rgba="1 0 0 1"/>
+                  <geom class="collision_geom" type="capsule" size="0.01" fromto="-0.044 -0.018 -0.025 0.123 -0.018 -0.025" rgba="1 0 0 1"/>
                   <body name="right_toe_link" pos="0.1 0 -0.02"/>
                 </body>
               </body>

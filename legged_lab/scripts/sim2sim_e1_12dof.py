@@ -6,9 +6,8 @@ import mujoco
 import mujoco.viewer  # 使用原生 viewer
 import numpy as np
 import onnxruntime
-from pynput import keyboard
 
-# 导入独立的手柄控制模块
+# 导入独立的手柄控制模块 (必须是咱们对齐过按键图谱的版本)
 from gamepad_controller import GamepadController
 
 
@@ -129,8 +128,6 @@ class MujocoRunner:
         self.phase_ratio = np.array([self.cfg.robot.gait_air_ratio_l, self.cfg.robot.gait_air_ratio_r])
         self.phase_offset = np.array([self.cfg.robot.gait_phase_offset_l, self.cfg.robot.gait_phase_offset_r])
 
-        # 分离键盘巡航指令和实际生效的融合指令
-        self.keyboard_cmd_vel = np.array([0.0, 0.0, 0.0])
         self.command_vel = np.array([0.0, 0.0, 0.0])
         
         self.obs_history = np.zeros(
@@ -164,68 +161,66 @@ class MujocoRunner:
         return self.obs_history
 
     def run(self) -> None:
-        self.setup_keyboard_listener()
-        self.listener.start()
-        print("[INFO] Sim2Sim 12DOF Started using Passive Viewer.")
-        print("[INFO] 控制说明: 推动手柄摇杆即刻接管控制；松开手柄恢复键盘定速巡航。\n")
+        print("[INFO] 🚀 Sim2Sim 12DOF Started using Passive Viewer.")
+        print("[INFO] 控制说明: 仅使用手柄控制。左摇杆平移，右摇杆(左右)转向。")
+        print("[INFO] 快捷指令: LT + B 退出仿真。\n")
 
         target_dof_pos = self.default_dof_pos.copy()
 
-        with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
-            while viewer.is_running() and self.data.time < self.cfg.sim.sim_duration:
-                step_start = time.time()
+        try:
+            with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
+                while viewer.is_running() and self.data.time < self.cfg.sim.sim_duration:
+                    step_start = time.time()
 
-                # 🔴 双模指令融合逻辑
-                pad_x, pad_y, pad_yaw = self.gamepad.get_commands()
-                # 如果手柄摇杆有实质性输入，手柄接管控制权
-                is_pad_active = abs(pad_x) > 0 or abs(pad_y) > 0 or abs(pad_yaw) > 0
-                
-                if is_pad_active:
+                    # 🔴 读取手柄指令
+                    pad_x, pad_y, pad_yaw = self.gamepad.get_commands()
                     self.command_vel = np.array([pad_x, pad_y, pad_yaw])
-                    ctrl_mode = "🎮 手柄"
-                else:
-                    self.command_vel = self.keyboard_cmd_vel.copy()
-                    ctrl_mode = "⌨️  键盘"
 
-                # 🔴 实时刷新打印当前生效的速度指令 (flush=True 保证立即输出不卡顿)
-                print(f"\r[{ctrl_mode}] 目标速度 -> X(前后): {self.command_vel[0]:5.2f} | Y(横移): {self.command_vel[1]:5.2f} | Yaw(转向): {self.command_vel[2]:5.2f}        ", end="", flush=True)
+                    # 🔴 便捷退出功能
+                    if hasattr(self.gamepad, 'get_button_b') and hasattr(self.gamepad, 'get_button_lt'):
+                        if self.gamepad.get_button_b() and self.gamepad.get_button_lt():
+                            print("\n[INFO] 🛑 接收到 LT + B，退出仿真！")
+                            break
 
-                # 1. 策略推理 (50Hz)
-                obs = self.get_obs()
-                onnx_input = {self.input_name: obs.reshape(1, -1)}
-                
-                # 获取并裁剪动作
-                raw_action = self.session.run(None, onnx_input)[0].flatten()[:12]
-                self.action[:] = np.clip(raw_action, -self.cfg.sim.clip_actions, self.cfg.sim.clip_actions)
-                
-                target_dof_pos = self.action * self.cfg.sim.action_scale + self.default_dof_pos
+                    # 🔴 实时刷新打印当前生效的速度指令 (flush=True 保证立即输出不卡顿)
+                    print(f"\r[🎮 手柄] 目标速度 -> X(前后): {self.command_vel[0]:5.2f} | Y(横移): {self.command_vel[1]:5.2f} | Yaw(转向): {self.command_vel[2]:5.2f}        ", end="", flush=True)
 
-                # 2. 物理步进与 PD 计算 (200Hz)
-                for _ in range(self.cfg.sim.decimation):
-                    # 获取当前姿态
-                    cur_q = np.array([self.data.qpos[i] for i in self.qpos_idx])
-                    cur_dq = np.array([self.data.qvel[i] for i in self.qvel_idx])
+                    # 1. 策略推理 (50Hz)
+                    obs = self.get_obs()
+                    onnx_input = {self.input_name: obs.reshape(1, -1)}
                     
-                    # 计算 PD 力矩
-                    tau = self.cfg.sim.kp * (target_dof_pos - cur_q) - self.cfg.sim.kd * cur_dq
+                    # 获取并裁剪动作
+                    raw_action = self.session.run(None, onnx_input)[0].flatten()[:12]
+                    self.action[:] = np.clip(raw_action, -self.cfg.sim.clip_actions, self.cfg.sim.clip_actions)
                     
-                    # 精准地将力矩输出到对应的电机上
-                    for i, act_id in enumerate(self.ctrl_idx):
-                        self.data.ctrl[act_id] = tau[i]
+                    target_dof_pos = self.action * self.cfg.sim.action_scale + self.default_dof_pos
+
+                    # 2. 物理步进与 PD 计算 (200Hz)
+                    for _ in range(self.cfg.sim.decimation):
+                        # 获取当前姿态
+                        cur_q = np.array([self.data.qpos[i] for i in self.qpos_idx])
+                        cur_dq = np.array([self.data.qvel[i] for i in self.qvel_idx])
+                        
+                        # 计算 PD 力矩
+                        tau = self.cfg.sim.kp * (target_dof_pos - cur_q) - self.cfg.sim.kd * cur_dq
+                        
+                        # 精准地将力矩输出到对应的电机上
+                        for i, act_id in enumerate(self.ctrl_idx):
+                            self.data.ctrl[act_id] = tau[i]
+                        
+                        mujoco.mj_step(self.model, self.data)
                     
-                    mujoco.mj_step(self.model, self.data)
-                
-                # 3. 渲染与状态更新
-                viewer.sync()
-                self.episode_length_buf += 1
-                self.calculate_gait_para()
+                    # 3. 渲染与状态更新
+                    viewer.sync()
+                    self.episode_length_buf += 1
+                    self.calculate_gait_para()
 
-                # 4. 保持实时率
-                time_until_next_step = self.dt - (time.time() - step_start)
-                if time_until_next_step > 0:
-                    time.sleep(time_until_next_step)
-
-        self.listener.stop()
+                    # 4. 保持实时率
+                    time_until_next_step = self.dt - (time.time() - step_start)
+                    if time_until_next_step > 0:
+                        time.sleep(time_until_next_step)
+        except KeyboardInterrupt:
+            print("\n[INFO] 捕捉到 Ctrl+C！退出仿真...")
 
     def quat_rotate_inverse(self, q, v):
         q_w = q[0]; q_vec = q[1:4]
@@ -235,25 +230,6 @@ class MujocoRunner:
         t = self.episode_length_buf * self.dt / self.gait_cycle
         self.gait_phase[0] = (t + self.phase_offset[0]) % 1.0
         self.gait_phase[1] = (t + self.phase_offset[1]) % 1.0
-
-    def adjust_command_vel(self, idx, increment):
-        # 这里只默默更新键盘指令，不再负责打印
-        self.keyboard_cmd_vel[idx] = np.clip(self.keyboard_cmd_vel[idx] + increment, -1.0, 1.0)
-
-    def setup_keyboard_listener(self) -> None:
-        def on_press(key):
-            try:
-                if key.char == "8": self.adjust_command_vel(0, 0.1)
-                elif key.char == "2": self.adjust_command_vel(0, -0.1)
-                elif key.char == "4": self.adjust_command_vel(1, -0.1)
-                elif key.char == "6": self.adjust_command_vel(1, 0.1)
-                elif key.char == "7": self.adjust_command_vel(2, 0.1)
-                elif key.char == "9": self.adjust_command_vel(2, -0.1)
-                elif key.char == "5":
-                    # 一键急停：直接清零键盘速度
-                    self.keyboard_cmd_vel[:] = 0.0
-            except AttributeError: pass
-        self.listener = keyboard.Listener(on_press=on_press)
 
 
 if __name__ == "__main__":

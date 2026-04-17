@@ -1,80 +1,104 @@
-# 文件名: gamepad_controller.py
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy" # 强制声明使用虚拟视频驱动，防止 Pygame 卡死在寻找显示器上！
 import pygame
 import time
 
 class GamepadController:
     def __init__(self, deadzone=0.15):
-        """
-        初始化手柄控制器
-        :param deadzone: 摇杆死区，范围0~1，过滤摇杆物理回中的轻微抖动
-        """
-        # 初始化 pygame 和 joystick 模块
-        pygame.init()
-        pygame.joystick.init()
+        # 不要用 pygame.init() 全局初始化！
+        pygame.display.init()   # 仅初始化事件队列所需的基础模块
+        pygame.joystick.init()  # 仅初始化手柄模块
+        
         self.joystick = None
         self.deadzone = deadzone
-        
-        # 检测是否连接了手柄
+
+        # 建立状态字典
+        self.axes = {}
+        self.buttons = {}
+
         if pygame.joystick.get_count() > 0:
             self.joystick = pygame.joystick.Joystick(0)
             self.joystick.init()
-            print(f"[INFO] 🎮 手柄已成功连接: {self.joystick.get_name()}")
+            print(f"[INFO] 🎮 手柄已连接: {self.joystick.get_name()}")
+            for i in range(self.joystick.get_numaxes()): self.axes[i] = 0.0
+            for i in range(self.joystick.get_numbuttons()): self.buttons[i] = False
         else:
-            print("[WARNING] ⚠️ 未检测到手柄，请检查无线接收器或蓝牙连接。")
+            print("[WARNING] ⚠️ 未检测到手柄！")
+
+    def update(self):
+        """核心：通过事件队列更新所有按键和摇杆状态"""
+        for event in pygame.event.get():
+            if event.type == pygame.JOYAXISMOTION:
+                self.axes[event.axis] = event.value
+            elif event.type == pygame.JOYBUTTONDOWN:
+                self.buttons[event.button] = True
+            elif event.type == pygame.JOYBUTTONUP:
+                self.buttons[event.button] = False
 
     def get_commands(self):
-        """
-        读取手柄摇杆数据并转换为机器人的速度指令
-        :return: cmd_x (前后), cmd_y (左右), cmd_yaw (转向)
-        """
-        # 必须调用 pump 更新 pygame 的内部事件队列，否则读不到数据
-        pygame.event.pump() 
-        
-        if self.joystick is None:
-            return 0.0, 0.0, 0.0
+        """获取并转换速度指令"""
+        self.update()
+        if self.joystick is None: return 0.0, 0.0, 0.0
 
-        # 获取摇杆轴的值 (范围 -1.0 到 1.0)
-        # 注意：不同操作系统(Linux/Win)轴的映射可能略有不同，以下为标准 XInput 映射
-        ly = self.joystick.get_axis(1)  # 左摇杆 Y轴 (控制前后)
-        lx = self.joystick.get_axis(0)  # 左摇杆 X轴 (控制左右横移)
+        # 严格按照你的硬件图谱映射！
+        lx = self.axes.get(0, 0.0)  # 左摇杆 左右 (Axis 0)
+        ly = self.axes.get(1, 0.0)  # 左摇杆 上下 (Axis 1)
         
-        # 针对 Linux 系统的容错处理 (某些内核下右摇杆X轴是 Axis 4 而不是 3)
-        try:
-            rx = self.joystick.get_axis(3)  # 右摇杆 X轴 (控制转向)
-        except pygame.error:
-            rx = self.joystick.get_axis(4) if self.joystick.get_numaxes() > 4 else 0.0
+        # 🔴 核心修复：将转向轴修改为你测出来的 Axis 3
+        rx = self.axes.get(3, 0.0)  
 
-        # 应用死区 (Deadzone) 过滤
-        ly = 0.0 if abs(ly) < self.deadzone else ly
         lx = 0.0 if abs(lx) < self.deadzone else lx
+        ly = 0.0 if abs(ly) < self.deadzone else ly
         rx = 0.0 if abs(rx) < self.deadzone else rx
 
-        # 计算速度指令
-        # 物理手柄向上推是负值，为了符合机器人坐标系(正前方为正)，需要加负号反转
-        cmd_x = -ly * 1.0  # 最大前进速度 1.0 m/s
-        cmd_y = -lx * 0.5  # 最大横移速度 0.5 m/s
-        cmd_yaw = -rx * 1.0 # 最大自转角速度 1.0 rad/s
+        # 前方为正，左侧为正，逆时针转为正
+        cmd_x = -ly * 1.0  
+        cmd_y = -lx * 0.5  
+        cmd_yaw = -rx * 1.0 
 
         return cmd_x, cmd_y, cmd_yaw
 
+    # ==========================================
+    # 全按键字典封装 (严格对齐你的硬件)
+    # ==========================================
+    def get_button_a(self): return self.buttons.get(0, False)
+    def get_button_b(self): return self.buttons.get(1, False)
+    def get_button_x(self): return self.buttons.get(3, False)
+    def get_button_y(self): return self.buttons.get(4, False)
+    def get_button_lb(self): return self.buttons.get(6, False)
+    def get_button_rb(self): return self.buttons.get(7, False)
+    
+    # 因为你的LT/RT是模拟按键，所以直接读 button 而不是 axis
+    def get_button_lt(self): return self.buttons.get(8, False) 
+    def get_button_rt(self): return self.buttons.get(9, False)
+    
+    def get_button_back(self): return self.buttons.get(10, False)
+    def get_button_start(self): return self.buttons.get(11, False)
 
 # ==========================================
-# 本地测试模块 (单独运行此文件时执行)
+# 硬件侦测工具 (已增强摇杆轴 Axis 侦测)
 # ==========================================
 if __name__ == "__main__":
-    print("--- 北通阿修罗 2 Pro 摇杆测试工具 ---")
-    print("请推动摇杆，按 Ctrl+C 退出测试\n")
+    print("--- 🎮 手柄硬件雷达 ---")
+    print("请分别推动左摇杆和右摇杆，观察屏幕上 '摇杆轴' 的变化！")
+    print("按 Ctrl+C 退出测试\n")
     
-    pad = GamepadController(deadzone=0.1)
-    
-    if pad.joystick is not None:
-        try:
-            while True:
-                x, y, yaw = pad.get_commands()
-                # 只在摇杆有动作时打印，防止刷屏
-                if abs(x) > 0 or abs(y) > 0 or abs(yaw) > 0:
-                    print(f"\r[摇杆数据] X(前进): {x:5.2f} | Y(横移): {y:5.2f} | Yaw(转向): {yaw:5.2f}    ", end="")
-                time.sleep(0.05) # 20Hz 采样率打印
-        except KeyboardInterrupt:
-            print("\n\n测试结束，退出程序。")
-            pygame.quit()
+    # 这里把 deadzone 设为 0，为了看清楚最原始的微小数据
+    pad = GamepadController(deadzone=0.0) 
+    try:
+        while True:
+            pad.update()
+            
+            # 获取当前被按下的按钮 ID
+            pressed_btns = [k for k, v in pad.buttons.items() if v]
+            
+            # 获取所有摇杆轴的值 (过滤掉轻微的零点漂移漂移，保留绝对值 > 0.05 的)
+            active_axes = {k: round(v, 2) for k, v in pad.axes.items() if abs(v) > 0.05}
+            
+            # 清除并同行打印
+            print(f"\r[雷达] 按键(Btn): {pressed_btns} | 摇杆轴(Axis): {active_axes}                        ", end="")
+            time.sleep(0.05)
+            
+    except KeyboardInterrupt:
+        print("\n\n[INFO] 测试结束，退出雷达。")
+        pygame.quit()

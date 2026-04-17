@@ -24,19 +24,26 @@ import torch
 # ==============================================================================
 # 宏定义 / 机器人配置开关
 # 在这里修改 ACTIVE_ROBOT 的值即可一键切换底层维度配置
-# 可选值: "e1_12dof", "tienkung", "e1_21dof"
+# 可选值: "e1_12dof", "e1_13dof", "tienkung", "e1_21dof", "e1_19dof"
 # ==============================================================================
-ACTIVE_ROBOT = "e1_12dof"
-# ACTIVE_ROBOT = "e1_21dof"
-#ACTIVE_ROBOT = "tienkung_12dof"
+# ACTIVE_ROBOT = "e1_12dof"
+# ACTIVE_ROBOT = "e1_13dof"
+# ACTIVE_ROBOT = "tienkung_12dof"
 # ACTIVE_ROBOT = "tienkung"
+# ACTIVE_ROBOT = "e1_21dof"
+# ACTIVE_ROBOT = "e1_19dof"  # 🔴 切换为 19DOF
+ACTIVE_ROBOT = "f1_12dof"  
+
 
 
 ROBOT_CONFIGS = {
     "e1_12dof": {"pos_size": 12, "vel_size": 12, "end_pos_size": 6},
+    "f1_12dof": {"pos_size": 12, "vel_size": 12, "end_pos_size": 6},
+    "e1_13dof": {"pos_size": 13, "vel_size": 13, "end_pos_size": 6}, 
     "tienkung_12dof": {"pos_size": 12, "vel_size": 12, "end_pos_size": 6},
     "tienkung": {"pos_size": 20, "vel_size": 20, "end_pos_size": 12},
     "e1_21dof": {"pos_size": 21, "vel_size": 21, "end_pos_size": 12},
+    "e1_19dof": {"pos_size": 19, "vel_size": 19, "end_pos_size": 12},  # 🔴 新增 19DOF 配置 (19关节 + 双手双脚12维末端)
 }
 
 class AMPLoader:

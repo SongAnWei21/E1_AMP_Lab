@@ -133,7 +133,7 @@ class E1_12DOF_RewardCfg:
             "asset_cfg": SceneEntityCfg(
                 "robot",
                 joint_names=[
-                    ".*hip_yaw_joint", ".*hip_roll_joint"  
+                    ".*hip_yaw_joint" 
                 ],
             )
         },
@@ -151,6 +151,19 @@ class E1_12DOF_RewardCfg:
             )
         },
     )
+    
+
+    # # 🔴🔴🔴 新增：零指令罚站惩罚 
+    # stand_still = RewTerm(
+    #     func=mdp.stand_still_when_zero_command,
+    #     weight=-0.5
+    # )
+
+    # 🔴 把之前的 stand_still 换成这个，或者跟它一起用
+    # stand_action_l2 = RewTerm(
+    #     func=mdp.action_l2_zero_command,
+    #     weight=-0.5  # 权重给高一点！逼迫它在原地站立时，Action 必须绝对输出 0
+    # )
 
     # --- 周期性步态奖励 (强制形成周期性迈步) ---
     gait_feet_frc_perio = RewTerm(func=mdp.gait_feet_frc_perio, weight=1.5, params={"delta_t": 0.02}) # 脚部接触力的周期性
@@ -160,9 +173,12 @@ class E1_12DOF_RewardCfg:
     # --- 杂项惩罚 ---
     ankle_torque = RewTerm(func=mdp.ankle_torque, weight=-0.0005) # 惩罚踝关节输出大扭矩
     ankle_action = RewTerm(func=mdp.ankle_action, weight=-0.001)  # 惩罚频繁使用踝关节动作
+
     hip_roll_action = RewTerm(func=mdp.hip_roll_action, weight=-1.0) # 强烈惩罚髋关节横滚(劈叉动作)
     hip_yaw_action = RewTerm(func=mdp.hip_yaw_action, weight=-1.0)   # 强烈惩罚髋关节偏航(内八/外八)
-    feet_y_distance = RewTerm(func=mdp.feet_y_distance, weight=-2.0) # 惩罚两脚在 Y 轴(横向)上的距离偏差
+
+
+    feet_y_distance = RewTerm(func=mdp.feet_y_distance, weight=-3.0) # 惩罚两脚在 Y 轴(横向)上的距离偏差
 
 
 # =====================================================================
@@ -172,7 +188,7 @@ class E1_12DOF_RewardCfg:
 @configclass
 class E1_12DOF_WalkFlatEnvCfg:
     # 纯显示用的 AMP 动作文件
-    amp_motion_files_display = ["legged_lab/envs/e1_12dof/datasets/motion_visualization/small_forward_boy.txt"]
+    amp_motion_files_display = ["legged_lab/envs/e1_12dof/datasets/motion_visualization/walk_1300fps.txt"]
     device: str = "cuda:0"
 
     # --- 场景配置 ---
@@ -220,7 +236,7 @@ class E1_12DOF_WalkFlatEnvCfg:
     # --- 速度指令配置 ---
     commands: CommandsCfg = CommandsCfg(
         resampling_time_range=(10.0, 10.0), # 每 10 秒重新采样一次目标指令
-        rel_standing_envs=0.2,              # 20% 的机器人被要求原地站立 (用于学习静止平衡)
+        rel_standing_envs=0.4,              # 20% 的机器人被要求原地站立 (用于学习静止平衡)                  # 0.2->0.5
         rel_heading_envs=1.0,               # 100% 的机器人使用朝向控制
         heading_command=True,
         heading_control_stiffness=0.5,
@@ -237,8 +253,8 @@ class E1_12DOF_WalkFlatEnvCfg:
     noise: NoiseCfg = NoiseCfg(
         add_noise=True,
         noise_scales=NoiseScalesCfg(
-            lin_vel=0.2, ang_vel=0.2, projected_gravity=0.05,
-            joint_pos=0.01, joint_vel=1.5, height_scan=0.1,
+            lin_vel=0.2, ang_vel=0.5, projected_gravity=0.1,
+            joint_pos=0.05, joint_vel=3.0, height_scan=0.1,
         ),
     )
 
@@ -348,13 +364,18 @@ class E1_12DOF_WalkAgentCfg(RslRlOnPolicyRunnerCfg):
     logger = "tensorboard"
     neptune_project = "e1_12dof_walk"
     wandb_project = "e1_12dof_walk"
+
     resume = False
     load_run = ".*"
-    load_checkpoint = "model_.*.pt"
+
+    # resume = True
+    # load_run = "2026-04-06_16-24-15"
+
+    load_checkpoint = "model_.*.pt" # 默认加载最新
 
     # --- AMP参数 ---
     amp_reward_coef = 0.3 # 动作模仿奖励的权重 (判别器认为动作越真，奖励越高)
-    amp_motion_files = ["legged_lab/envs/e1_12dof/datasets/motion_amp_expert/small_forward_boy.txt"] # 专家动作捕捉数据文件
+    amp_motion_files = ["legged_lab/envs/e1_12dof/datasets/motion_amp_expert/walk_1300fps.txt"] # 专家动作捕捉数据文件
     amp_num_preload_transitions = 200000 # 预加载的动捕数据帧数
     amp_task_reward_lerp = 0.7           # 任务奖励(Task Reward)和模仿奖励(AMP Reward)的融合比例
     amp_discr_hidden_dims = [1024, 512, 256] # 判别器(Discriminator)的网络结构

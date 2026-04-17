@@ -91,13 +91,14 @@ E1_21DOF_CFG = ArticulationCfg(
             "waist_yaw_joint":0.0,
 
             "left_shoulder_pitch_joint": 0.0,
-            "left_shoulder_roll_joint": 0.05,
+            "left_shoulder_roll_joint": 0.25,
             "left_shoulder_yaw_joint": 0.0,
-            "left_elbow_joint": 0.78,
+            "left_elbow_joint": 1.0,
+
             "right_shoulder_pitch_joint": 0.0,
-            "right_shoulder_roll_joint": 0.0,
-            "right_shoulder_yaw_joint": 0.05,
-            "right_elbow_joint": 0.78
+            "right_shoulder_roll_joint": -0.25,
+            "right_shoulder_yaw_joint": 0.0,
+            "right_elbow_joint": 1.0
         },
         joint_vel={".*": 0.0},
     ),
@@ -129,10 +130,10 @@ E1_21DOF_CFG = ArticulationCfg(
                 ".*_knee_joint": 100,
             },
             damping={
-                ".*_hip_pitch_joint": 5,
-                ".*_hip_roll_joint": 5,
-                ".*_hip_yaw_joint": 3,
-                ".*_knee_joint": 5,
+                ".*_hip_pitch_joint": 4,
+                ".*_hip_roll_joint": 4,
+                ".*_hip_yaw_joint": 2.5,
+                ".*_knee_joint": 4,
             },
             armature={
                 ".*_hip_pitch_joint":  ARMATURE_RS03,
@@ -159,8 +160,8 @@ E1_21DOF_CFG = ArticulationCfg(
                 ".*_ankle_roll_joint": 20,
             },
             damping={
-                ".*_ankle_pitch_joint": 2, 
-                ".*_ankle_roll_joint": 2,
+                ".*_ankle_pitch_joint": 1.5, 
+                ".*_ankle_roll_joint": 1.5,
             },
             armature={
                 ".*_ankle_pitch_joint": ARMATURE_RS06,
@@ -172,7 +173,7 @@ E1_21DOF_CFG = ArticulationCfg(
             velocity_limit_sim=VELOCITY_LIMIT_RS03,
             joint_names_expr=["waist_yaw_joint"], 
             stiffness=100,
-            damping=5, 
+            damping=4, 
             armature=ARMATURE_RS03,
         ),
         "arms": ImplicitActuatorCfg(

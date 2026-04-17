@@ -24,18 +24,23 @@ import torch
 # ==============================================================================
 # 宏定义 / 机器人配置开关
 # 在这里修改 ACTIVE_ROBOT 的值即可一键切换底层维度配置
-# 可选值: "e1_12dof", "tienkung", "e1_21dof"
 # ==============================================================================
+ACTIVE_ROBOT = "f1_12dof"
 # ACTIVE_ROBOT = "e1_12dof"
-ACTIVE_ROBOT = "e1_21dof"
-#ACTIVE_ROBOT = "tienkung_12dof"
-#ACTIVE_ROBOT = "tienkung"
+# ACTIVE_ROBOT = "e1_13dof"  
+# ACTIVE_ROBOT = "e1_21dof"
+# ACTIVE_ROBOT = "e1_19dof"  # 🔴 切换为 19DOF
+# ACTIVE_ROBOT = "tienkung_12dof"
+# ACTIVE_ROBOT = "tienkung"
 
 
 ROBOT_CONFIGS = {
-    "tienkung": {"pos_size": 26, "vel_size": 26},  # 注意：如果你确定天工是20dof，请把这里的26改成20
+    "tienkung": {"pos_size": 26, "vel_size": 26},  
     "tienkung_12dof": {"pos_size": 18, "vel_size": 18},
     "e1_12dof": {"pos_size": 18, "vel_size": 18},
+    "f1_12dof": {"pos_size": 18, "vel_size": 18},
+    "e1_13dof": {"pos_size": 19, "vel_size": 19},  
+    "e1_19dof": {"pos_size": 25, "vel_size": 25},  # 🔴 19DOF 配置 = 6维根节点 + 19维关节
     "e1_21dof": {"pos_size": 27, "vel_size": 27},
 }
 

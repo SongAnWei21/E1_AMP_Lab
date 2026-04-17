@@ -50,6 +50,20 @@ from legged_lab.envs.e1_12dof.walk_cfg import (
     E1_12DOF_WalkFlatEnvCfg,
 )
 
+# e1_13dof
+from legged_lab.envs.e1_13dof.e1_13dof_env import E1_13DOF_Env
+from legged_lab.envs.e1_13dof.walk_cfg import (
+    E1_13DOF_WalkAgentCfg,
+    E1_13DOF_WalkFlatEnvCfg,
+)
+
+# e1_19dof
+from legged_lab.envs.e1_19dof.e1_19dof_env import E1_19DOF_Env
+from legged_lab.envs.e1_19dof.walk_cfg import (
+    E1_19DOF_WalkAgentCfg,
+    E1_19DOF_WalkFlatEnvCfg,
+)
+
 # tienkung_12dof
 from legged_lab.envs.tienkung_12dof.tienkung_12dof_env import TienKung12DOFEnv
 from legged_lab.envs.tienkung_12dof.walk_cfg import (
@@ -62,6 +76,13 @@ from legged_lab.envs.g1_12dof.g1_12dof_env import G1_12DOFEnv
 from legged_lab.envs.g1_12dof.walk_cfg import (
     G1_12DOFWalkAgentCfg,
     G1_12DOFWalkFlatEnvCfg,
+)
+
+# f1_12dof
+from legged_lab.envs.f1_12dof.f1_12dof_env import F1_12DOF_Env
+from legged_lab.envs.f1_12dof.walk_cfg import (
+    F1_12DOF_WalkAgentCfg,
+    F1_12DOF_WalkFlatEnvCfg,
 )
 
 from legged_lab.utils.task_registry import task_registry
@@ -80,6 +101,11 @@ task_registry.register("e1_21dof_walk", E1_21DOF_Env, E1_21DOF_WalkFlatEnvCfg(),
 task_registry.register("e1_21dof_run", E1_21DOF_Env, E1_21DOF_RunFlatEnvCfg(), E1_21DOF_RunAgentCfg())
 
 task_registry.register("e1_12dof_walk", E1_12DOF_Env, E1_12DOF_WalkFlatEnvCfg(), E1_12DOF_WalkAgentCfg())
+task_registry.register("e1_13dof_walk", E1_13DOF_Env, E1_13DOF_WalkFlatEnvCfg(), E1_13DOF_WalkAgentCfg())
+task_registry.register("e1_19dof_walk", E1_19DOF_Env, E1_19DOF_WalkFlatEnvCfg(), E1_19DOF_WalkAgentCfg())
+
+task_registry.register("f1_12dof_walk", F1_12DOF_Env, F1_12DOF_WalkFlatEnvCfg(), F1_12DOF_WalkAgentCfg())
+
 task_registry.register("tienkung_12dof_walk", TienKung12DOFEnv, TienKung12DOFWalkFlatEnvCfg(), TienKung12DOFWalkAgentCfg())
 task_registry.register("g1_12dof_walk", G1_12DOFEnv, G1_12DOFWalkFlatEnvCfg(), G1_12DOFWalkAgentCfg())
 
